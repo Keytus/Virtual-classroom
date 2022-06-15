@@ -34,6 +34,7 @@ class StudentComponent extends React.Component {
     }
 
     onMessageReceived = (payload) => {
+        this.sleep(50);
         StudentService.getStudents().then((response) => {
             this.setState({ students: response.data });
         });
@@ -165,6 +166,14 @@ class StudentComponent extends React.Component {
             console.log("Not find")
         }
     }
+
+    sleep(milliseconds) {
+        const date = Date.now();
+        let currentDate = null;
+        do {
+          currentDate = Date.now();
+        } while (currentDate - date < milliseconds);
+      }
 }
 
 export default StudentComponent
