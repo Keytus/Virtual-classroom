@@ -10,6 +10,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import javax.validation.Valid;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -33,7 +34,7 @@ public class StudentController {
                 .collect(Collectors.toList());
     }
     @PostMapping("/students")
-    public ResponseEntity<StudentDto> createStudent(@RequestBody StudentDto studentDto) {
+    public ResponseEntity<StudentDto> createStudent(@RequestBody @Valid StudentDto studentDto) {
         Student studentRequest = modelMapper.map(studentDto, Student.class);
 
         Student post = studentService.createStudent(studentRequest);
@@ -51,7 +52,7 @@ public class StudentController {
         return ResponseEntity.ok().body(studentResponse);
     }
     @PutMapping("/students/{id}")
-    public ResponseEntity<StudentDto> updateStudent(@PathVariable Long id, @RequestBody StudentDto studentDto){
+    public ResponseEntity<StudentDto> updateStudent(@PathVariable Long id, @RequestBody @Valid StudentDto studentDto){
         Student studentRequest = modelMapper.map(studentDto, Student.class);
 
         Student post = studentService.updateStudent(id, studentRequest);
