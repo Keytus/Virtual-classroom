@@ -1,53 +1,68 @@
 package com.controller;
 
 import com.model.Student;
-import com.repository.StudentRepository;
+import com.model.StudentDto;
+import com.service.StudentService;
+import org.modelmapper.ModelMapper;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.rest.webmvc.ResourceNotFoundException;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
 
 @CrossOrigin(origins = "http://localhost:3000")
 @RestController
 @RequestMapping(value = "/api/")
 public class StudentController {
     @Autowired
-    private StudentRepository studentRepository;
+    private ModelMapper modelMapper;
+    private StudentService studentService;
+    public StudentController(StudentService studentService){
+        super();
+        this.studentService = studentService;
+    }
     @GetMapping("/students")
-    public List<Student> getUsers(){
-        return this.studentRepository.findAll();
+    public List<StudentDto> getStudents(){
+        return studentService.getStudents().stream()
+                .map(student -> modelMapper.map(student, StudentDto.class))
+                .collect(Collectors.toList());
     }
     @PostMapping("/students")
-    public Student createUser(@RequestBody Student user) {
-        return this.studentRepository.save(user);
+    public ResponseEntity<StudentDto> createStudent(@RequestBody StudentDto studentDto) {
+        Student studentRequest = modelMapper.map(studentDto, Student.class);
+
+        Student post = studentService.createStudent(studentRequest);
+
+        StudentDto studentResponse = modelMapper.map(post, StudentDto.class);
+
+        return new ResponseEntity<StudentDto>(studentResponse, HttpStatus.CREATED);
     }
     @GetMapping("/students/{id}")
-    public ResponseEntity<Student> getStudentById(@PathVariable Long id) {
-        Student user = studentRepository.findById(id)
-                .orElseThrow(() -> new ResourceNotFoundException("Student not exist with id :" + id));
-        return ResponseEntity.ok(user);
+    public ResponseEntity<StudentDto> getStudentById(@PathVariable Long id) {
+        Student student = studentService.getStudentById(id);
+
+        StudentDto studentResponse = modelMapper.map(student, StudentDto.class);
+
+        return ResponseEntity.ok().body(studentResponse);
     }
     @PutMapping("/students/{id}")
-    public ResponseEntity<Student> updateStudent(@PathVariable Long id, @RequestBody Student studentDetails){
-        Student student = studentRepository.findById(id)
-                .orElseThrow(() -> new ResourceNotFoundException("Student not exist with id :" + id));
+    public ResponseEntity<StudentDto> updateStudent(@PathVariable Long id, @RequestBody StudentDto studentDto){
+        Student studentRequest = modelMapper.map(studentDto, Student.class);
 
-        student.setName(studentDetails.getName());
-        student.setHandStatus(studentDetails.getHandStatus());
+        Student post = studentService.updateStudent(id, studentRequest);
 
-        Student updatedUser = studentRepository.save(student);
-        return ResponseEntity.ok(updatedUser);
+        StudentDto studentResponse = modelMapper.map(post, StudentDto.class);
+
+        return ResponseEntity.ok().body(studentResponse);
     }
     @DeleteMapping("/students/{id}")
     public ResponseEntity<Map<String, Boolean>> deleteStudent(@PathVariable Long id) {
-        Student student = studentRepository.findById(id)
-                .orElseThrow(() -> new ResourceNotFoundException("Student not exist with id :" + id));
-
-        studentRepository.delete(student);
+        studentService.deleteStudent(id);
         Map<String, Boolean> response = new HashMap<>();
         response.put("deleted", Boolean.TRUE);
         return ResponseEntity.ok(response);
