@@ -2,41 +2,58 @@ import React from "react";
 import StudentService from "../services/StudentService";
 import { over } from 'stompjs';
 import SockJS from 'sockjs-client';
+import { getCurrentUser, USER_FIELD } from "./LoginComponent";
+import { useHistory } from 'react-router-dom'
+import { useState, useEffect } from 'react'
+import { Dropdown } from 'react-bootstrap'
 
 var stompClient = null;
+const LOGIN_PATH = '/login';
 
-class StudentComponent extends React.Component {
-    constructor(props) {
-        super(props)
-        this.state = {
-            students: [],
-        }
-        this.createStudentTest = this.createStudentTest.bind(this);
-        this.deleteStudentTest = this.deleteStudentTest.bind(this);
-        this.changeHandStatusTest = this.changeHandStatusTest.bind(this);
-        this.findTableRowByName = this.findTableRowByName.bind(this);
-        this.findStudentByName = this.findStudentByName.bind(this);
-    }
+export const Students = () => {
+    const navigate = useHistory();
+    const [students, setStudents] = useState([]);
+    const [userData, setUserData] = useState({
+        username: '',
+        connected: false
+    });
 
-    componentDidMount() {
+    useEffect(() => {
+        connect();
+    }, []);
+
+    const connect = () => {
         StudentService.getStudents().then((response) => {
-            this.setState({ students: response.data });
+            setStudents(response.data);
+            if (!stompClient) {
+                let Sock = new SockJS('http://localhost:8083/ws');
+                stompClient = over(Sock);
+                stompClient.connect({}, onConnected, onError);
+            }
         });
-        if (!stompClient) {
-            let Sock = new SockJS('http://localhost:8083/ws');
-            stompClient = over(Sock);
-            stompClient.connect({}, this.onConnected, this.onError);
+    }
+
+    const onConnected = () => {
+        setUserData({ "username": getCurrentUser(), "connected": true });
+        stompClient.subscribe('/classroom', onMessageReceived);
+        studentJoin();
+    }
+
+    const studentJoin = () => {
+        if (stompClient) {
+            let chatMessage = {
+                studentName: userData.username,
+                content: "",
+                action: "JOIN"
+            };
+            stompClient.send("/app/message", {}, JSON.stringify(chatMessage));
         }
     }
 
-    onConnected = () => {
-        stompClient.subscribe('/classroom', this.onMessageReceived);
-    }
-
-    onMessageReceived = (payload) => {
-        this.sleep(50);
+    const onMessageReceived = (payload) => {
+        sleep(50);
         StudentService.getStudents().then((response) => {
-            this.setState({ students: response.data });
+            setStudents(response.data);
         });
         let payloadData = JSON.parse(payload.body);
         switch (payloadData.action) {
@@ -50,26 +67,23 @@ class StudentComponent extends React.Component {
                 console.log(payloadData.studentName, "use hand action");
                 break;
         }
-
     }
 
-    onError = (err) => {
+    const onError = (err) => {
         console.log(err);
     }
 
-    findTableRowByName(studentName) {
-        let tableRef = document.getElementById("studentsTable");
-        for (let row of tableRef.rows) {
-            if (row.cells[0] != undefined && row.cells[0].innerHTML === studentName) {
-                return row;
-            }
-        }
-        return null;
+    const sleep = (milliseconds) => {
+        const date = Date.now();
+        let currentDate = null;
+        do {
+            currentDate = Date.now();
+        } while (currentDate - date < milliseconds);
     }
 
-    findStudentByName(studentName) {
+    const findStudentByName = (studentName) => {
         let selectedStudent = null;
-        this.state.students.map(
+        students.map(
             student => {
                 if (student.name === studentName) {
                     selectedStudent = student;
@@ -79,53 +93,27 @@ class StudentComponent extends React.Component {
         return selectedStudent;
     }
 
-    render() {
-        return (
-            <div>
-                <input type="text" id="nameInput" placeholder="Enter name"/>
-                <button onClick={this.createStudentTest}>Create</button>
-                <button onClick={this.changeHandStatusTest}>Hand</button>
-                <button onClick={this.deleteStudentTest}>Delete</button>
-                <h1 className="text-center">Students List</h1>
-                <table id="studentsTable" className="table table-striped">
-                    <thead>
-                        <tr>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {
-                            this.state.students.map(
-                                student =>
-                                    <tr key={student.id}>
-                                        <td>{student.name}</td>
-                                        <td>{student.handStatus}</td>
-                                    </tr>
-                            )
-                        }
-                    </tbody>
-                </table>
-            </div>
-        )
-    }
-
-    changeHandStatusTest() {
-        let selectedName = document.getElementById("nameInput").value;
-        let selectedStudent = this.findStudentByName(selectedName);
+    const changeHandStatusTest = () => {
+        let selectedStudent = findStudentByName(userData.username);
+        let handUpDown = document.getElementById('handUpDown');
         if (selectedStudent) {
             let handContent;
             if (selectedStudent.handStatus === "✋") {
                 selectedStudent.handStatus = "";
+                handUpDown.innerHTML = "Raise hand up";
                 StudentService.updateStudent(selectedStudent, selectedStudent.id);
                 handContent = "Down";
             }
             else {
+
                 selectedStudent.handStatus = "✋";
+                handUpDown.innerHTML = "Raise hand down";
                 StudentService.updateStudent(selectedStudent, selectedStudent.id);
                 handContent = "Up";
             }
             if (stompClient) {
                 let chatMessage = {
-                    studentName: selectedName,
+                    studentName: userData.username,
                     content: handContent,
                     action: "RAISE_HAND_UP_OR_DOWN"
                 };
@@ -134,46 +122,92 @@ class StudentComponent extends React.Component {
         }
     }
 
-    createStudentTest() {
-        let selectedName = document.getElementById("nameInput").value;
-        var student = { name: selectedName, handStatus: "" };
-        StudentService.createStudent(student);
-        if (stompClient) {
-            let chatMessage = {
-                studentName: selectedName,
-                content: "",
-                action: "JOIN"
-            };
-            stompClient.send("/app/message", {}, JSON.stringify(chatMessage));
-        }
-    }
-
-    deleteStudentTest() {
-        let selectedName = document.getElementById("nameInput").value;
-        let selectedStudent = this.findStudentByName(selectedName);
+    const handleLogout = () => {
+        let selectedStudent = findStudentByName(userData.username);
         if (selectedStudent) {
-            StudentService.deleteStudent(selectedStudent.id);
-            if (stompClient) {
-                let chatMessage = {
-                    studentName: selectedName,
-                    content: "",
-                    action: "LEAVE"
-                };
-                stompClient.send("/app/message", {}, JSON.stringify(chatMessage));
-            }
+            StudentService.deleteStudent(selectedStudent.id)
+                .then(() => {
+                    if (stompClient) {
+                        let chatMessage = {
+                            studentName: userData.username,
+                            content: "",
+                            action: "LEAVE"
+                        };
+                        stompClient.send("/app/message", {}, JSON.stringify(chatMessage));
+                    }
+                    sessionStorage.removeItem(USER_FIELD);
+                    navigate.push(LOGIN_PATH);
+                    navigate.go();
+                })
+                .catch((e) => {
+                    console.log(e);
+                });
         }
         else {
             console.log("Not find")
         }
     }
 
-    sleep(milliseconds) {
-        const date = Date.now();
-        let currentDate = null;
-        do {
-          currentDate = Date.now();
-        } while (currentDate - date < milliseconds);
-      }
+    return (
+        <div className="content">
+            <header>
+                <nav className="navbar navbar-light bg-light header__navbar">
+                    <Dropdown>
+                        <Dropdown.Toggle variant="primary" menuVariant="dark" id="dropdown-actions">
+                            Actions
+                        </Dropdown.Toggle>
+
+                        <Dropdown.Menu>
+                            <Dropdown.Item id="handUpDown" onClick={changeHandStatusTest}>Raise hand up</Dropdown.Item>
+                        </Dropdown.Menu>
+                    </Dropdown>
+
+                    <Dropdown>
+                        <Dropdown.Toggle as={CustomToggle} id="dropdown-student">
+                            {userData.username}
+                        </Dropdown.Toggle>
+
+                        <Dropdown.Menu align={{ lg: 'end' }}>
+                            <Dropdown.Item onClick={handleLogout}>Logout</Dropdown.Item>
+                        </Dropdown.Menu>
+                    </Dropdown>
+                </nav>
+            </header>
+            <main className="main-students">
+                <label>Class members
+                    <table id="studentsTable" className="main-students__table table-responsive table-sm">
+                        <thead>
+                            <tr>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {
+                                students.map(
+                                    student =>
+                                        <tr key={student.id}>
+                                            <td style={{ width: "98.00%" }}>{student.name}</td>
+                                            <td style={{ width: "2.00%" }}>{student.handStatus}</td>
+                                        </tr>
+                                )
+                            }
+                        </tbody>
+                    </table>
+                </label>
+            </main>
+        </div>
+    )
 }
 
-export default StudentComponent
+
+const CustomToggle = React.forwardRef(({ children, onClick }, ref) => (
+    <span
+        style={{ cursor: "pointer" }}
+        onClick={(e) => {
+            e.preventDefault();
+            onClick(e);
+        }}
+    >
+        {children}
+        &#x25bc;
+    </span>
+));
