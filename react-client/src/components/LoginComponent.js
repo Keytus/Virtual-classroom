@@ -21,7 +21,7 @@ export const Login = () => {
         navigate.go();
       })
       .catch((e) => {
-        setErrorMessage("A problem has been occurred while submitting your login data");
+        setErrorMessage(e.response.data.name);
       });
   }
   const handleClearError = () => {

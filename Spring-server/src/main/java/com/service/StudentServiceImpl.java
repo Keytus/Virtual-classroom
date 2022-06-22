@@ -4,7 +4,9 @@ import com.model.Student;
 import com.repository.StudentRepository;
 import org.springframework.data.rest.webmvc.ResourceNotFoundException;
 import org.springframework.stereotype.Service;
+import org.springframework.web.bind.annotation.RequestBody;
 
+import javax.validation.Valid;
 import java.util.List;
 
 @Service
@@ -47,5 +49,11 @@ public class StudentServiceImpl implements StudentService{
         Student student = studentRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Student not exist with id :" + id));
         studentRepository.delete(student);
+    }
+
+    @Override
+    public boolean isStudentExist(String name) {
+        List<Student> result = studentRepository.findByName(name);
+        return !result.isEmpty();
     }
 }
