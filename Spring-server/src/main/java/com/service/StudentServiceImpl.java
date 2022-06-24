@@ -48,4 +48,10 @@ public class StudentServiceImpl implements StudentService{
                 .orElseThrow(() -> new ResourceNotFoundException("Student not exist with id :" + id));
         studentRepository.delete(student);
     }
+
+    @Override
+    public boolean isStudentExist(String name) {
+        List<Student> result = studentRepository.findByName(name);
+        return !result.isEmpty();
+    }
 }

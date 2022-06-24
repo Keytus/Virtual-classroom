@@ -5,7 +5,6 @@ import com.model.StudentDto;
 import com.service.StudentService;
 import org.modelmapper.ModelMapper;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.data.rest.webmvc.ResourceNotFoundException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -52,7 +51,7 @@ public class StudentController {
         return ResponseEntity.ok().body(studentResponse);
     }
     @PutMapping("/students/{id}")
-    public ResponseEntity<StudentDto> updateStudent(@PathVariable Long id, @RequestBody @Valid StudentDto studentDto){
+    public ResponseEntity<StudentDto> updateStudent(@PathVariable Long id, @RequestBody StudentDto studentDto){
         Student studentRequest = modelMapper.map(studentDto, Student.class);
 
         Student post = studentService.updateStudent(id, studentRequest);
@@ -67,5 +66,8 @@ public class StudentController {
         Map<String, Boolean> response = new HashMap<>();
         response.put("deleted", Boolean.TRUE);
         return ResponseEntity.ok(response);
+    }
+    public StudentService getStudentService() {
+        return studentService;
     }
 }
